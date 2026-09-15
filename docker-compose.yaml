@@ -103,7 +103,11 @@ services:
             - EGRESS_GATEWAY_FILE_SERVER_URL=http://file_server:3000
             - EGRESS_GATEWAY_TOOL_CALL_SERVER_URL=http://tool_call_server:3033
             - EGRESS_GATEWAY_MAX_TOOL_CALL_BYTES=1048576
-            - CODEAPI_EGRESS_GRANT_SECRET=${CODEAPI_EGRESS_GRANT_SECRET:-localdev-egress-grant-secret-change-me-32b}
+            # Scoped to the gateway only. Coolify injects app-level compose
+            # variables into every service, and CODEAPI_EGRESS_GRANT_SECRET is
+            # rejected on api/service-worker startup in hardened mode — so the
+            # overridable app var uses the gateway-specific name.
+            - CODEAPI_EGRESS_GRANT_SECRET=${CODEAPI_GATEWAY_EGRESS_GRANT_SECRET:-localdev-egress-grant-secret-change-me-32b}
             - CODEAPI_INTERNAL_SERVICE_TOKEN=${CODEAPI_INTERNAL_SERVICE_TOKEN:-localdev-internal-service-token}
             - REDIS_HOST=redis
             - REDIS_PORT=6379
