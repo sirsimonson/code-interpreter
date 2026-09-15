@@ -134,38 +134,25 @@ services:
         build:
           context: .
           dockerfile: api/Dockerfile
-          target: sandbox-nsjail
+          target: sandbox-runner-true
         container_name: sandbox-runner
         restart: always
-        privileged: true
-        security_opt:
-            - seccomp=./seccomp/nsjail.json
-        cap_add:
-            - SYS_ADMIN
-            - SYS_CHROOT
-            - SYS_PTRACE
-            - SETUID
-            - SETGID
-            - NET_ADMIN
-            - DAC_OVERRIDE
-            - DAC_READ_SEARCH
-            - CHOWN
-            - FOWNER
-            - FSETID
-            - KILL
-            - SETFCAP
-            - MKNOD
+        privileged: false
+        devices:
+            - ${KVM_DEVICE_PATH:-/dev/kvm}:/dev/kvm
         ports:
             - 2000:2000
         volumes:
             - ${SANDBOX_PACKAGES_PATH:-./data/pkgs}:/host-packages:ro
         environment:
-            - KVM_ENABLED=false
-            - SANDBOX_USE_CGROUPV2=false
-            - SANDBOX_REMOVE_UMOUNT_AFTER_STARTUP=false
+            - KVM_ENABLED=true
+            # The direct path uses /host-packages itself. The KVM path must not
+            # hand that directory to libkrun as a long-lived virtio-fs share.
             - LAUNCHER_PACKAGES_HOST=/disabled-host-packages
             - CODEAPI_HARDENED_SANDBOX_MODE=${CODEAPI_HARDENED_SANDBOX_MODE:-true}
-            - EGRESS_GATEWAY_URL=http://egress_gateway:3190
+            # KVM microVM cannot resolve Docker DNS names — use the local
+            # TCP forwarder set up by SANDBOX_FORWARD_TARGET instead.
+            - EGRESS_GATEWAY_URL=http://localhost:3190
             - SANDBOX_EXECUTE_BODY_LIMIT=${SANDBOX_EXECUTE_BODY_LIMIT:-50mb}
             - SANDBOX_PACKAGES_DIRECTORY=/pkgs
             - SANDBOX_LOG_LEVEL=DEBUG
@@ -195,13 +182,11 @@ services:
             egress_gateway:
                 condition: service_healthy
         healthcheck:
-            test:
-                - CMD-SHELL
-                - >-
-                    bun -e "fetch('http://localhost:2000/api/v2/runtimes').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
-            interval: 10s
-            timeout: 5s
-            retries: 6
+            test: ["CMD", "/usr/local/bin/sandbox-runner-healthcheck.sh"]
+            interval: 5s
+            timeout: 3s
+            retries: 60
+            start_period: 20s
 
     file_server:
         build:
