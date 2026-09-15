@@ -136,6 +136,7 @@ services:
           dockerfile: api/Dockerfile
           target: sandbox-build
         container_name: sandbox-runner
+        entrypoint: ["/sandbox_api/entrypoint.sh"]
         restart: always
         privileged: true
         security_opt:
