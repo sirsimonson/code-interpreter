@@ -150,9 +150,10 @@ services:
             # hand that directory to libkrun as a long-lived virtio-fs share.
             - LAUNCHER_PACKAGES_HOST=/disabled-host-packages
             - CODEAPI_HARDENED_SANDBOX_MODE=${CODEAPI_HARDENED_SANDBOX_MODE:-true}
-            # KVM microVM cannot resolve Docker DNS names — use the local
-            # TCP forwarder set up by SANDBOX_FORWARD_TARGET instead.
-            - EGRESS_GATEWAY_URL=http://localhost:3190
+            # TSI opens guest sockets in this container's network namespace and
+            # the launcher forwards Docker's resolver into the guest, so the
+            # guest reaches the egress gateway by service name.
+            - EGRESS_GATEWAY_URL=http://egress_gateway:3190
             - SANDBOX_EXECUTE_BODY_LIMIT=${SANDBOX_EXECUTE_BODY_LIMIT:-50mb}
             - SANDBOX_PACKAGES_DIRECTORY=/pkgs
             - SANDBOX_LOG_LEVEL=DEBUG
