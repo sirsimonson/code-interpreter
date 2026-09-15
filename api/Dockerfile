@@ -190,6 +190,12 @@ ENV PORT=2000 \
 EXPOSE 2000/tcp
 ENTRYPOINT ["/sandbox_api/entrypoint.sh"]
 
+# Direct NsJail runtime with packages baked in (no external mount needed).
+# Combines local-oci-runtime env with package-builder output.
+FROM local-oci-runtime AS sandbox-nsjail
+
+COPY --from=package-builder /pkgs /pkgs
+
 # Dedicated resident-process host. This image deliberately keeps the runner
 # control listener on 8080 and exposes one fixed user-app port separately.
 # `/execute` is disabled when hosted-app mode is enabled; the control plane

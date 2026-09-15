@@ -134,9 +134,8 @@ services:
         build:
           context: .
           dockerfile: api/Dockerfile
-          target: sandbox-build
+          target: sandbox-nsjail
         container_name: sandbox-runner
-        entrypoint: ["/sandbox_api/entrypoint.sh"]
         restart: always
         privileged: true
         security_opt:
