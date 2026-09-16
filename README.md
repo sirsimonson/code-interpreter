@@ -146,9 +146,11 @@ language runtimes, but package-heavy workloads do not accumulate host file
 descriptors in the launcher.
 
 KVM guests use the runner container's `/etc/resolv.conf`, including Docker's
-embedded resolver or Kubernetes nameservers and search domains. The launcher
-preserves service hostnames instead of pinning their startup IP addresses.
-Both baked and directory rootfs images contain a resolver symlink whose target
+embedded resolver or Kubernetes nameservers and search domains. The guest
+cannot query Docker's embedded resolver (127.0.0.11) over TSI, so the launcher
+resolves configured service names to container-side IPs before booting the
+microVM; a failed lookup warns and passes the hostname through. Both baked and
+directory rootfs images contain a resolver symlink whose target
 is populated by a guest wrapper in private `/run` runtime storage before any
 `LAUNCHER_EXEC` executable starts; the
 read-only root disk does not need modification at boot. Rebuild the runner

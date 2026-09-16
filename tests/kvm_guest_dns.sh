@@ -68,14 +68,15 @@ configure_guest_dns "$TEST_DIR/direct"
 cmp "$TEST_DIR/expected" "$TEST_DIR/direct/etc/resolv.conf"
 
 # Exercise the actual launcher script up to exec, substituting only its binary.
-# Service names (including HTTPS authority and IPv6) must never be rewritten.
+# Service names resolve to container-side IPs before the guest boots; literal
+# addresses (dotted IPv4, bracketed IPv6) pass through untouched.
 mkdir "$TEST_DIR/bin"
 cat > "$TEST_DIR/bin/launcher" <<'STUB'
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "$EGRESS_GATEWAY_URL" == 'https://egress_gateway:3190/base' ]]
+[[ "$EGRESS_GATEWAY_URL" == 'https://192.0.2.99:3190/base' ]]
 [[ "$FILE_SERVER_URL" == 'http://[::1]:3000/base' ]]
-[[ "$SANDBOX_FORWARD_TARGET" == 'tool_call_server:3033' ]]
+[[ "$SANDBOX_FORWARD_TARGET" == '192.0.2.99:3033' ]]
 printf '%s\n' "$SANDBOX_RESOLV_CONF" > "$TEST_RESOLVER_OUTPUT"
 STUB
 cat > "$TEST_DIR/bin/getent" <<'STUB'
@@ -158,6 +159,26 @@ if run_entrypoint "$TEST_DIR/bad-resolv.conf" 2> "$TEST_DIR/entrypoint-error"; t
 fi
 grep -q 'has no nameserver' "$TEST_DIR/entrypoint-error"
 [[ ! -e "$TEST_DIR/forwarded" ]]
+
+# A resolver outage must not block the boot: hostnames warn and pass through
+# unchanged instead of pinning a stale or invented address.
+cat > "$TEST_DIR/bin/getent" <<'STUB'
+#!/usr/bin/env bash
+exit 2
+STUB
+cat > "$TEST_DIR/bin/launcher" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$EGRESS_GATEWAY_URL" == 'https://egress_gateway:3190/base' ]]
+[[ "$FILE_SERVER_URL" == 'http://[::1]:3000/base' ]]
+[[ "$SANDBOX_FORWARD_TARGET" == 'tool_call_server:3033' ]]
+printf '%s\n' "$SANDBOX_RESOLV_CONF" > "$TEST_RESOLVER_OUTPUT"
+STUB
+chmod +x "$TEST_DIR/bin/getent" "$TEST_DIR/bin/launcher"
+run_entrypoint "$TEST_DIR/docker-resolv.conf" 2> "$TEST_DIR/entrypoint-warning"
+[[ "$(cat "$TEST_DIR/forwarded")" == "$(encoded_reference "$TEST_DIR/docker-resolv.conf")" ]]
+grep -q 'could not resolve egress_gateway' "$TEST_DIR/entrypoint-warning"
+grep -q 'could not resolve tool_call_server' "$TEST_DIR/entrypoint-warning"
 
 # Every rootfs assembly path must prepare DNS after COPY, before disk creation.
 python3 - "$ROOT" <<'PY'
